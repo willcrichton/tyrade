@@ -126,7 +126,7 @@ fn session_type_test() {
 
 > Note: the `@` syntax is a hacky way to express type annotations on variables in patterns. For various technical reasons, Tyrade cannot support type inference.
 
-Tyrade provides a standard library of type-level building blocks like booleans, numbers, and lists. For example, we can use lists to implement the compile-time saving and indexing of jump points in session types.
+Tyrade provides a standard library of type-level building blocks like [booleans](https://github.com/willcrichton/tyrade/blob/master/src/tyrade_bool.rs), [numbers](https://github.com/willcrichton/tyrade/blob/master/src/tyrade_num.rs), and [lists](https://github.com/willcrichton/tyrade/blob/master/src/tyrade_list.rs). For example, we can use lists to implement the compile-time saving and indexing of jump points in session types.
 
 ```rust
 struct Chan<Env, S>(PhantomData<(Env, S)>);
@@ -163,3 +163,47 @@ fn session_type_test() {
   let _: Chan<Cons<Close, Nil>, Close> = c.goto();
 }
 ```
+
+## How does Tyrade work?
+
+Consider the translation of `TAdd`. Here's the Tyrade definition:
+
+```rust
+fn TAdd(N1: TNum, N2: TNum) -> TNum {
+  match N1 {
+    Z => N2,
+    S(N3 @ TNum) => TAdd(N3, S(N2))
+  }
+}
+```
+
+And here's the generated Rust code:
+
+```rust
+pub trait ComputeTAdd<N2>: TNum {
+    type Output: TNum;
+}
+
+pub type TAdd<N1, N2> = <N1 as ComputeTAdd<N2>>::Output;
+
+impl<N2> ComputeTAdd<N2> for Z
+where N2: TNum
+{
+    type Output = N2;
+}
+
+impl<N3, N2> ComputeTAdd<N2> for S<N3>
+where
+    N2: TNum,
+    N3: TNum + ComputeTAdd<S<N2>>
+{
+    type Output = TAdd<N3, S<N2>>;
+}
+```
+
+At a high level, Tyrade does the following for you:
+1. The compiler sets up the necessary traits and type definitions (`ComputeTAdd` and `TAdd`).
+2. While compiling the operators to types, all operations are added as `where` constraints. For example, `TAdd(N3, S(N2))` creates the constraint `N3: ComputeTAdd<S<N2>>`.
+3. The compiler generates a different `impl` for each match branch. In the case of multiple matches, e.g. as in `MaxLevel`, the compiler generates an impl for the cartesian product of all match branches.
+
+See [trans.rs](https://github.com/willcrichton/tyrade/blob/master/tyrade-macro/src/trans.rs) for the details.
