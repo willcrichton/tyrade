@@ -44,7 +44,7 @@ Others have shown that Rust traits are [Turing-complete](https://sdleffler.githu
 
 As a simple example, consider two types `HighSec` and `LowSec` representing the security of an item:
 
-```
+```rust
 struct HighSec;
 struct LowSec;
 
@@ -69,6 +69,12 @@ impl ComputeMaxLevel<HighSec> for HighSec { type Output = HighSec; }
 
 // The type alias gives us a more convenient way to "call" the type operator
 type MaxLevel<L, R> = <L as ComputeMaxLevel<R>>::Output;
+
+fn sec_tests() {
+  // example unit tests
+  assert_type_eq::<Low, MaxLevel<Low, Low>>();
+  assert_type_eq::<High, MaxLevel<Low, High>>();
+}
 ```
 
 The goal of Tyrade is to perform this translation automatically from a functional programming model. Using Tyrade, this program is written as:
@@ -91,6 +97,8 @@ tyrade!{
   }
 }
 ```
+
+This way, both the data-type definition and the type-level program are expressed using familiar constructs like `enum` and `match`.
 
 ## More complex example: session and list types
 
