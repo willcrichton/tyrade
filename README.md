@@ -207,3 +207,13 @@ At a high level, Tyrade does the following for you:
 3. The compiler generates a different `impl` for each match branch. In the case of multiple matches, e.g. as in `MaxLevel`, the compiler generates an impl for the cartesian product of all match branches.
 
 See [trans.rs](https://github.com/willcrichton/tyrade/blob/master/tyrade-macro/src/trans.rs) for the details.
+
+## Next steps
+
+Tyrade is experimental, meaning I'm still discovering the boundaries of what's possible. There are two main areas of inquiry:
+
+1. What type-language mechanisms does Rust's trait system permit? For example, I was not able to implement `==` since type equality in Rust doesn't quite work as we need it. Higher-kinded types would be useful as well to enable proper polymorphic type functions.
+
+2. What application areas can benefit from a type-level programming language? Session types are the most complex example I've seen so far, but I'd be really interested to find other use cases for Tyrade.
+
+Please let me know if you'd be interested in using or contributing to Tyrade! Email me at wcrichto@cs.stanford.edu.
