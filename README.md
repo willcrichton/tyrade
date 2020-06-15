@@ -9,9 +9,9 @@ Tyrade is a proof-of-concept language showing how Rust traits enable a general p
 
 ```rust
 tyrade! {
-  enum TBool {
-    TTrue,
-    TFalse
+  enum TNum {
+    Z,
+    S(TNum)
   }
 
   fn TAdd(N1: TNum, N2: TNum) -> TNum {
