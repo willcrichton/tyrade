@@ -20,5 +20,7 @@ impl Parse for ItemVec {
 pub fn tyrade(tokens: TokenStream) -> TokenStream {
   let items = parse_macro_input!(tokens as ItemVec).0;
   let tokens = items.into_iter().map(trans::translate_item).collect::<Vec<_>>();
-  TokenStream::from(quote!{ #(#tokens)* })
+  TokenStream::from(quote!{
+    #(#tokens)*
+  })
 }

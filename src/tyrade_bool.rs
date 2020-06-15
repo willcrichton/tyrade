@@ -1,20 +1,8 @@
-use tyrant_macro::tyrant;
+use tyrade_macro::tyrade;
+use crate::tyrade_types::*;
 
-tyrant! {
-  enum TBool {
-    TTrue,
-    TFalse
-  }
-}
-
-pub trait ComputeTypeEquals<T> { type Output: TBool; }
-pub type TypeEquals<T1, T2> = <T1 as ComputeTypeEquals<T2>>::Output;
-
-impl<T> ComputeTypeEquals<T> for T { type Output = TTrue; }
-impl<T1, T2> ComputeTypeEquals<T2> for T1 { default type Output = TFalse; }
-
-tyrant! {
-  fn TIf(Cond: TBool, Then: Type, Else: Type) -> Type {
+tyrade! {
+  fn TIf<K>(Cond: TBool, Then: K, Else: K) -> K {
     match Cond {
       TTrue => Then,
       TFalse => Else
