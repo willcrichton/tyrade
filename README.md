@@ -1,5 +1,10 @@
 # Tyrade: a pure functional language for type-level programming in Rust
 
+* [Motivating example: security types](#motivating-example-security-types)
+* [More complex example: session and list types](#more-complex-example-session-and-list-types)
+* [How does Tyrade work?](#how-does-tyrade-work)
+* [Next steps](#next-steps)
+
 Tyrade is a proof-of-concept language showing how Rust traits enable a general purpose type-level programming model. Its goal is to show that type-level programming is possible for useful tasks (not writing Turing machines), and programs can be written in a reasonable way. Here's what the language looks like:
 
 ```rust
