@@ -1,5 +1,3 @@
-#![feature(iterator_fold_self)]
-
 use proc_macro::TokenStream;
 
 mod trans;

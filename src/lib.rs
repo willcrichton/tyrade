@@ -1,5 +1,3 @@
-#![feature(specialization)]
-
 mod tyrade_types;
 mod tyrade_bool;
 mod tyrade_num;

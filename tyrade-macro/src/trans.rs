@@ -166,8 +166,10 @@ impl FnTransOutput {
       .map(|outp| {
         let args = outp.clone().into_iter()
           .map(|o| o.output_ty).collect::<Vec<_>>();
-        let merged_env = outp.into_iter().map(|o| o.env)
-            .fold_first(|env1, env2| env1.merge(env2)).unwrap();
+        let first_env = outp[0].env.clone();
+        let merged_env = outp.into_iter().skip(1).map(|o| o.env)
+            .fold(first_env,
+                  |env1, env2| env1.merge(env2));
         f(merged_env, args)
       })
       .collect::<Vec<_>>()
