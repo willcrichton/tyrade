@@ -1,5 +1,7 @@
 # Tyrade: a pure functional language for type-level programming in Rust
 
+![ci](https://github.com/willcrichton/tyrade/workflows/ci/badge.svg)
+
 * [Motivating example: security types](#motivating-example-security-types)
 * [More complex example: session and list types](#more-complex-example-session-and-list-types)
 * [How does Tyrade work?](#how-does-tyrade-work)
