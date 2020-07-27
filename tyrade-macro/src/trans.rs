@@ -1,14 +1,26 @@
 use std::collections::{HashMap, HashSet};
 use syn::{Item, ItemEnum, ItemFn, Fields, Type, TypePath, Ident, FnArg, Pat, PatIdent, Path, Stmt, Expr, BinOp, PathSegment, ExprBlock, parse2, Block, ReturnType, GenericParam, TypeParam};
-use syn::visit_mut::VisitMut;
+use quote::ToTokens;
+use syn::visit_mut::{self, VisitMut};
 use proc_macro2::{TokenStream, Span};
 use quote::quote;
 use itertools::Itertools;
 use std::hash::Hash;
 
+#[allow(dead_code)]
+fn fmt<T: ToTokens>(t: &T) -> String {
+  format!("{}", t.to_token_stream())
+}
+
+macro_rules! tpanic {
+  ($args:tt) => {
+    panic!("[{}:{}] {}", file!(), line!(), format!($args))
+  }
+}
+
 fn type_to_ident(ty: &Type) -> Option<Ident> {
   if let Type::Path(TypePath { path, .. }) = ty {
-    Some(path.get_ident().unwrap().clone())
+    Some(path.get_ident().unwrap_or_else(|| tpanic!("type_to_ident path.get_ident()")).clone())
   } else {
     None
   }
@@ -41,6 +53,49 @@ fn kind_to_type(kind: &Ident) -> Option<Type> {
   }
 }
 
+struct SubstituteVisitor {
+  src: Ident,
+  dst: Type
+}
+
+impl VisitMut for SubstituteVisitor {
+  fn visit_type_mut(&mut self, node: &mut Type) {
+    visit_mut::visit_type_mut(self, node);
+
+    if let Type::Path(path) = node {
+      if let Some(ident) = path.path.get_ident() {
+        if ident == &self.src {
+          *node = self.dst.clone();
+        }
+      }
+    }
+  }
+}
+
+fn substitute(ty: &mut Type, src: &Ident, dst: &Type) {
+  let mut renamer = SubstituteVisitor { src: src.clone(), dst: dst.clone() };
+  renamer.visit_type_mut(ty);
+}
+
+struct RenameVisitor {
+  src: Ident,
+  dst: Ident
+}
+
+impl VisitMut for RenameVisitor {
+  fn visit_ident_mut(&mut self, node: &mut Ident) {
+    if &self.src == node {
+      *node = self.dst.clone();
+    }
+  }
+}
+
+fn rename(fn_: &mut ItemFn, src: Ident, dst: Ident) {
+  let mut renamer = RenameVisitor { src, dst };
+  renamer.visit_item_fn_mut(fn_);
+}
+
+
 pub fn translate_enum(enum_: ItemEnum) -> TokenStream {
   let trait_name = &enum_.ident;
 
@@ -67,7 +122,6 @@ pub fn translate_enum(enum_: ItemEnum) -> TokenStream {
 
     let just_params = params.iter().map(|(id, _)| quote!{ #id } )
       .collect::<Vec<_>>();
-
 
     let compute_trait = if just_params.len() > 0 {
       let compute_name = Ident::new(
@@ -175,15 +229,10 @@ fn translate_expr(env: &FnTransEnv, cur_kind: &Ident, expr: &Expr) -> Vec<FnTran
   match expr {
     Expr::Match(match_) => {
       let matched_ident = if let Expr::Path(path) = &*match_.expr {
-        path.path.get_ident().unwrap()
+        path.path.get_ident().unwrap_or_else(|| tpanic!("path.get_ident()"))
       } else {
         unimplemented!("match expr")
       };
-
-      let match_ty = ident_to_type(matched_ident);
-      let arg_idx = env.args.iter()
-        .position(|arg| arg == &match_ty)
-        .expect(&format!("Invalid match on {}", matched_ident));
 
       match_.arms.iter().map(|arm| {
         let (variant, fields) = match &arm.pat {
@@ -191,22 +240,22 @@ fn translate_expr(env: &FnTransEnv, cur_kind: &Ident, expr: &Expr) -> Vec<FnTran
             (ident.clone(), vec![])
           }
           Pat::TupleStruct(tuple_struct) => {
-            let variant = tuple_struct.path.get_ident().unwrap().clone();
+            let variant = tuple_struct.path.get_ident().unwrap_or_else(|| tpanic!("path.get_ident()")).clone();
             let fields = tuple_struct.pat.elems.iter().map(|p| {
-              if let Pat::Ident(PatIdent { ident, subpat, .. }) = &p  {
-                let kind = if let Some((_, p2)) = subpat {
-                  if let Pat::Ident(PatIdent { ident, .. }) = &**p2 {
-                    ident.clone()
+              match &p {
+                Pat::Ident(PatIdent { ident, subpat, .. }) => {
+                  let kind = if let Some((_, p2)) = subpat {
+                    match &**p2 {
+                      Pat::Ident(PatIdent { ident, .. }) => ident.clone(),
+                      _ => tpanic!("RHS of @ must be an ident")
+                    }
                   } else {
-                    panic!("RHS of @ must be an ident")
-                  }
-                } else {
-                  panic!("Match tuple struct must have @ trait annotation")
-                };
+                    tpanic!("Match tuple struct must have @ trait annotation")
+                  };
 
-                (ident.clone(), kind)
-              } else {
-                unimplemented!("match pat ident")
+                  (ident.clone(), kind)
+                },
+                _ => unimplemented!("match pat ident: {:?}", p)
               }
             }).collect::<Vec<_>>();
             (variant, fields)
@@ -224,8 +273,11 @@ fn translate_expr(env: &FnTransEnv, cur_kind: &Ident, expr: &Expr) -> Vec<FnTran
         // then update args to be [X, Q<Z>]
         let new_type: Type = parse2(quote! {
           #variant<#(#field_names),*>
-        }).unwrap();
-        env.args[arg_idx] = new_type.clone();
+        }).unwrap_or_else(|_| tpanic!("parse failed"));
+
+        for arg in env.args.iter_mut() {
+          substitute(arg, matched_ident, &new_type);
+        }
 
         // if quantifiers = [X, Y] then replace [Y] with [Z]
         env.quantifiers = env.quantifiers.into_iter()
@@ -234,10 +286,15 @@ fn translate_expr(env: &FnTransEnv, cur_kind: &Ident, expr: &Expr) -> Vec<FnTran
         env.quantifiers.extend(field_names);
 
         // if bounds = {Y: Foo<X>} then rename to {Q<Z>: Foo<X>}
-        let bounds = env.bounds
-          .remove(&ident_to_type(&matched_ident))
-          .unwrap();
-        env.bounds.insert(new_type.clone(), bounds);
+        env.bounds = env.bounds.into_iter()
+          .map(|(mut k, mut v)| {
+            substitute(&mut k, matched_ident, &new_type);
+            for ty in v.iter_mut() {
+              substitute(ty, matched_ident, &new_type);
+            }
+            (k, v)
+          })
+          .collect::<HashMap<_, _>>();
 
         // add field bounds
         for (ident, kind) in fields.iter() {
@@ -247,6 +304,9 @@ fn translate_expr(env: &FnTransEnv, cur_kind: &Ident, expr: &Expr) -> Vec<FnTran
         }
 
         // add substitution for Y -> Q<Z>
+        for (_, v) in env.substitutions.iter_mut() {
+          substitute(v, matched_ident, &new_type);
+        }
         env.substitutions.insert(matched_ident.clone(), new_type);
 
         translate_expr(&env, cur_kind, &arm.body)
@@ -254,7 +314,7 @@ fn translate_expr(env: &FnTransEnv, cur_kind: &Ident, expr: &Expr) -> Vec<FnTran
     },
 
     Expr::Path(path) => {
-      let ident = path.path.get_ident().unwrap();
+      let ident = path.path.get_ident().unwrap_or_else(|| tpanic!("path.get_ident()"));
       let ty = env.substitutions.get(&ident).cloned()
         .unwrap_or_else(|| ident_to_type(ident));
       vec![FnTransOutput {
@@ -286,7 +346,7 @@ fn translate_expr(env: &FnTransEnv, cur_kind: &Ident, expr: &Expr) -> Vec<FnTran
         BinOp::Sub(_) => quote!{ TSub },
         _ => unimplemented!("binop {:?}", binop.op)
       };
-      let trans_expr: Expr = parse2(quote!{ #op(#left, #right) }).unwrap();
+      let trans_expr: Expr = parse2(quote!{ #op(#left, #right) }).unwrap_or_else(|_| tpanic!("trans_expr parse"));
       translate_expr(env, cur_kind, &trans_expr)
     }
 
@@ -294,10 +354,10 @@ fn translate_expr(env: &FnTransEnv, cur_kind: &Ident, expr: &Expr) -> Vec<FnTran
       let cond = &if_.cond;
       let then = &if_.then_branch;
       let else_ = &if_.else_branch.as_ref()
-        .expect("If expression must have an 'else'").1;
+        .unwrap_or_else(|| tpanic!("If expression must have an 'else'")).1;
       let if_name = Ident::new(
         &format!("TIf{}", cur_kind), Span::call_site());
-      let trans_expr: Expr = parse2(quote!{ #if_name(#cond, #then, #else_) }).unwrap();
+      let trans_expr: Expr = parse2(quote!{ #if_name(#cond, #then, #else_) }).unwrap_or_else(|_| tpanic!("trans_expr parse"));
       translate_expr(env, cur_kind, &trans_expr)
     }
 
@@ -311,7 +371,7 @@ fn translate_expr(env: &FnTransEnv, cur_kind: &Ident, expr: &Expr) -> Vec<FnTran
 
     Expr::Call(call) => {
       let func_ident = if let Expr::Path(path) = &*call.func {
-        path.path.get_ident().unwrap()
+        path.path.get_ident().unwrap_or_else(|| tpanic!("path.get_ident()"))
       } else {
         unimplemented!("func ident")
       };
@@ -321,7 +381,7 @@ fn translate_expr(env: &FnTransEnv, cur_kind: &Ident, expr: &Expr) -> Vec<FnTran
         .collect::<Vec<_>>();
 
       FnTransOutput::merge(args, |mut env, args| {
-        let first_arg: Type = parse2(args[0].clone()).unwrap();
+        let first_arg: Type = parse2(args[0].clone()).unwrap_or_else(|_| tpanic!("first_arg parse"));
         let bounds = env.bounds
           .entry(first_arg.clone())
           .or_insert_with(|| Vec::new());
@@ -329,7 +389,7 @@ fn translate_expr(env: &FnTransEnv, cur_kind: &Ident, expr: &Expr) -> Vec<FnTran
           &format!("Compute{}", func_ident), Span::call_site());
         let remaining_args = &args[1..];
         bounds.push(
-          parse2(quote!{ #compute_ident<#(#remaining_args),*> }).unwrap());
+          parse2(quote!{ #compute_ident<#(#remaining_args),*> }).unwrap_or_else(|_| tpanic!("bounds parse")));
 
         let output_ty = quote!{ #func_ident<#(#args),*> };
         FnTransOutput { output_ty, env }
@@ -386,7 +446,7 @@ fn gen_impls(fn_: ItemFn) -> TokenStream {
   let return_kind: Type = if let ReturnType::Type(_, kind) = &fn_.sig.output {
     (**kind).clone()
   } else {
-    panic!("Function must have return type")
+    tpanic!("Function must have return type")
   };
 
   // Run translation
@@ -434,24 +494,6 @@ fn gen_impls(fn_: ItemFn) -> TokenStream {
 
     #(#impls)*
   }
-}
-
-struct Rename {
-  src: Ident,
-  dst: Ident
-}
-
-impl VisitMut for Rename {
-  fn visit_ident_mut(&mut self, node: &mut Ident) {
-    if &self.src == node {
-      *node = self.dst.clone();
-    }
-  }
-}
-
-fn rename(fn_: &mut ItemFn, src: Ident, dst: Ident) {
-  let mut renamer = Rename { src, dst };
-  renamer.visit_item_fn_mut(fn_);
 }
 
 pub fn translate_fn(fn_: ItemFn) -> TokenStream {
