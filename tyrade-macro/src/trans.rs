@@ -123,7 +123,7 @@ pub fn translate_enum(enum_: ItemEnum) -> TokenStream {
     let just_params = params.iter().map(|(id, _)| quote!{ #id } )
       .collect::<Vec<_>>();
 
-    let compute_trait = if just_params.len() > 0 {
+    let compute_trait = if !just_params.is_empty() {
       let compute_name = Ident::new(
         &format!("Compute{}", name), Span::call_site());
       let first_param = &just_params[0];
@@ -160,14 +160,14 @@ struct FnTransEnv {
   substitutions: HashMap<Ident, Type>
 }
 
-fn merge_vecs<T: Clone + Eq + Hash>(v1: &Vec<T>, v2: &Vec<T>) -> Vec<T> {
+fn merge_vecs<T: Clone + Eq + Hash>(v1: &[T], v2: &[T]) -> Vec<T> {
   let h1 = v1.iter().collect::<HashSet<_>>();
   let h2 = v2.iter().collect::<HashSet<_>>();
   (&h1 | &h2).iter().cloned().cloned().collect::<Vec<_>>()
 }
 
 impl FnTransEnv {
-  fn merge(self, other: FnTransEnv) -> FnTransEnv {
+  fn merge(mut self, other: FnTransEnv) -> FnTransEnv {
     let args = self.args.iter()
       .zip(other.args.iter())
       .map(|(arg1, arg2)| {
@@ -186,15 +186,14 @@ impl FnTransEnv {
 
     let mut bounds = self.bounds.clone();
     for (k, v) in other.bounds.clone().into_iter() {
-      let v2 = bounds.entry(k).or_insert(vec![]);
+      let v2 = bounds.entry(k).or_insert_with(Vec::new);
       *v2 = merge_vecs(&v, v2);
     }
 
     // TODO: is this correct?
-    let mut substitutions = self.substitutions.clone();
-    substitutions.extend(other.substitutions.clone().into_iter());
+    self.substitutions.extend(other.substitutions.into_iter());
 
-    FnTransEnv { args, quantifiers, bounds, substitutions }
+    FnTransEnv { args, quantifiers, bounds, substitutions: self.substitutions }
   }
 }
 
@@ -324,7 +323,7 @@ fn translate_expr(env: &FnTransEnv, cur_kind: &Ident, expr: &Expr) -> Vec<FnTran
     }
 
     Expr::Tuple(tuple) => {
-      if tuple.elems.len() == 0 {
+      if tuple.elems.is_empty() {
         vec![FnTransOutput {
           env: env.clone(),
           output_ty: quote! { () }
@@ -383,8 +382,8 @@ fn translate_expr(env: &FnTransEnv, cur_kind: &Ident, expr: &Expr) -> Vec<FnTran
       FnTransOutput::merge(args, |mut env, args| {
         let first_arg: Type = parse2(args[0].clone()).unwrap_or_else(|_| tpanic!("first_arg parse"));
         let bounds = env.bounds
-          .entry(first_arg.clone())
-          .or_insert_with(|| Vec::new());
+          .entry(first_arg)
+          .or_insert_with(Vec::new);
         let compute_ident = Ident::new(
           &format!("Compute{}", func_ident), Span::call_site());
         let remaining_args = &args[1..];
@@ -483,7 +482,7 @@ fn gen_impls(fn_: ItemFn) -> TokenStream {
   let (first_name, first_ty) = args[0].clone();
   let return_kind = kind_to_type(&type_to_ident(&return_kind).unwrap())
       .map(|kind| quote! { #kind })
-      .unwrap_or_else(|| quote!{});
+      .unwrap_or_else(TokenStream::new);
   quote! {
     pub trait #compute_name<#(#arg_names),*>: #first_ty {
       type Output: #return_kind;
@@ -498,7 +497,7 @@ fn gen_impls(fn_: ItemFn) -> TokenStream {
 
 pub fn translate_fn(fn_: ItemFn) -> TokenStream {
   let generics = &fn_.sig.generics.params;
-  let impls = if generics.len() > 0 {
+  let impls = if !generics.is_empty() {
     if let GenericParam::Type(TypeParam { ident, .. }) = &generics[0] {
       BASE_KINDS.iter()
         .map(|base_kind| {
@@ -514,7 +513,7 @@ pub fn translate_fn(fn_: ItemFn) -> TokenStream {
           let new_name = format!("{}{}", fn_name, base_kind);
           rename(
             &mut fn_,
-            fn_name.clone(),
+            fn_name,
             Ident::new(&new_name, Span::call_site()));
 
           gen_impls(fn_)
