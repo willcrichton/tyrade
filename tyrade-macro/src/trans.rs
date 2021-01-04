@@ -6,8 +6,8 @@ use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 use syn::visit_mut::{self, VisitMut};
 use syn::{
-  parse2, BinOp, Block, Expr, ExprBlock, Fields, FnArg, GenericParam, Ident, Item, ItemEnum,
-  ItemFn, Pat, PatIdent, Path, PathSegment, ReturnType, Stmt, Type, TypeParam, TypePath,
+  parse2, BinOp, Block, Expr, ExprBlock, Fields, GenericParam, Ident, Item, ItemEnum,
+  ItemFn, Pat, PatIdent, Path, PathSegment, Stmt, Type, TypeParam, TypePath,
 };
 
 #[allow(dead_code)]
@@ -56,7 +56,7 @@ fn block_to_expr(block: Block) -> Expr {
   })
 }
 
-fn kind_to_type(kind: &Ident) -> Option<Type> {
+fn _kind_to_type(kind: &Ident) -> Option<Type> {
   if &format!("{}", kind) == "Type" {
     None
   } else {
@@ -104,7 +104,7 @@ impl VisitMut for RenameVisitor {
   }
 }
 
-fn rename(fn_: &mut ItemFn, src: Ident, dst: Ident) {
+fn _rename(fn_: &mut ItemFn, src: Ident, dst: Ident) {
   let mut renamer = RenameVisitor { src, dst };
   renamer.visit_item_fn_mut(fn_);
 }
@@ -141,7 +141,7 @@ pub fn translate_enum(enum_: ItemEnum) -> TokenStream {
         .map(|(id, _)| quote! { #id })
         .collect::<Vec<_>>();
 
-      let compute_trait = if just_params.len() > 0 {
+      let compute_trait = if !just_params.is_empty() {
         let compute_name = Ident::new(&format!("Compute{}", name), Span::call_site());
         let first_param = &just_params[0];
         let remaining_params = &just_params[1..];
@@ -184,7 +184,7 @@ fn merge_vecs<T: Clone + Eq + Hash>(v1: &[T], v2: &[T]) -> Vec<T> {
 }
 
 impl FnTransEnv {
-  fn merge(self, other: FnTransEnv) -> FnTransEnv {
+  fn merge(mut self, other: FnTransEnv) -> FnTransEnv {
     let args = self
       .args
       .iter()
@@ -216,7 +216,7 @@ impl FnTransEnv {
       args,
       quantifiers,
       bounds,
-      substitutions,
+      ..self
     }
   }
 }
@@ -283,7 +283,7 @@ fn translate_expr(env: &FnTransEnv, expr: &Expr) -> Vec<FnTransOutput> {
                 .elems
                 .iter()
                 .map(|p| match &p {
-                  Pat::Ident(PatIdent { ident, subpat, .. }) => ident.clone(),
+                  Pat::Ident(PatIdent { ident, .. }) => ident.clone(),
                   _ => unimplemented!("match pat ident: {:?}", p),
                 })
                 .collect::<Vec<_>>();
@@ -293,7 +293,7 @@ fn translate_expr(env: &FnTransEnv, expr: &Expr) -> Vec<FnTransOutput> {
           };
 
           let mut env = env.clone();
-          let field_names = fields.clone();
+          let field_names = fields;
 
           // if args = [X, Y] and expr is match Y { Q(Z) => ... }
           // then update args to be [X, Q<Z>]
@@ -422,12 +422,12 @@ fn translate_expr(env: &FnTransEnv, expr: &Expr) -> Vec<FnTransOutput> {
         .collect::<Vec<_>>();
 
       FnTransOutput::merge(args, |mut env, args| {
-        let compute_ty = if env.quantifiers.iter().find(|i| i == &func_ident).is_some() {
+        let compute_ty = if env.quantifiers.iter().any(|i| i == func_ident) {
           let family = str_to_ident(format!("Family{}", args.len()));
           let bounds = env
             .bounds
             .entry(parse2(quote! { #func_ident }).unwrap())
-            .or_insert_with(|| Vec::new());
+            .or_insert_with(Vec::new);
           bounds.push(parse2(quote! { #family }).unwrap());
           quote! { #func_ident ::Func }
         } else {
@@ -435,8 +435,8 @@ fn translate_expr(env: &FnTransEnv, expr: &Expr) -> Vec<FnTransOutput> {
           let ident = str_to_ident(format!("Compute{}", func_ident));
           let bounds = env
             .bounds
-            .entry(first_arg.clone())
-            .or_insert_with(|| Vec::new());
+            .entry(first_arg)
+            .or_insert_with(Vec::new);
           let remaining_args = &args[1..];
           bounds.push(
             parse2(quote! { #ident<#(#remaining_args),*> })
