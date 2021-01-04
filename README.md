@@ -16,18 +16,10 @@ tyrade! {
     S(TNum)
   }
 
-  fn TAdd(N1: TNum, N2: TNum) -> TNum {
+  fn TAdd<N1, N2>() {
     match N1 {
       Z => N2,
-      S(N3 @ TNum) => TAdd(N3, S(N2))
-    }
-  }
-
-  fn TDivide(N1: TNum, N2: TNum) -> TNum {
-    if N2 <= N1 {
-      S(Z) + (N1 - N2) / N2
-    } else {
-      Z
+      S(N3) => TAdd(N3, S(N2))
     }
   }
 }
@@ -88,9 +80,9 @@ tyrade!{
     High
   }
 
-  fn MaxLevel(S1: Security, S2: Security) -> Security {
+  fn MaxLevel<S1, S2>() {
     match S1 {
-      Low => match S2 {
+      Low => S2,
         Low => Low,
         High => High
       }
@@ -118,15 +110,15 @@ tyrade! {
     Goto(TNum)
   }
 
-  fn Dual(S: SessionType) -> SessionType {
+  fn Dual<S>() {
     match S {
       Close => S,
-      Recv(T @ Type, S2 @ SessionType) => Send(T, Dual(S2)),
-      Send(T @ Type, S2 @ SessionType) => Recv(T, Dual(S2)),
-      Choose(S2 @ SessionType, S3 @ SessionType) => Offer(Dual(S2), Dual(S3)),
-      Offer(S2 @ SessionType, S3 @ SessionType) => Choose(Dual(S2), Dual(S3)),
-      Label(S2 @ SessionType) => Label(Dual(S2)),
-      Goto(N @ TNum) => S
+      Recv(T, S2) => Send(T, Dual(S2)),
+      Send(T, S2) => Recv(T, Dual(S2)),
+      Choose(S2, S3) => Offer(Dual(S2), Dual(S3)),
+      Offer(S2, S3) => Choose(Dual(S2), Dual(S3)),
+      Label(S2) => Label(Dual(S2)),
+      Goto(N) => S
     }
   }
 }
@@ -138,8 +130,6 @@ fn session_type_test() {
   >();
 }
 ```
-
-> Note: the `@` syntax is a hacky way to express type annotations on variables in patterns. For various technical reasons, Tyrade cannot support type inference.
 
 Tyrade provides a standard library of type-level building blocks like [booleans](https://github.com/willcrichton/tyrade/blob/master/src/tyrade_bool.rs), [numbers](https://github.com/willcrichton/tyrade/blob/master/src/tyrade_num.rs), and [lists](https://github.com/willcrichton/tyrade/blob/master/src/tyrade_list.rs). For example, we can use lists to implement the compile-time saving and indexing of jump points in session types.
 
@@ -184,7 +174,7 @@ fn session_type_test() {
 Consider the translation of `TAdd`. Here's the Tyrade definition:
 
 ```rust
-fn TAdd(N1: TNum, N2: TNum) -> TNum {
+fn TAdd<N1, N2>() {
   match N1 {
     Z => N2,
     S(N3 @ TNum) => TAdd(N3, S(N2))
@@ -195,22 +185,19 @@ fn TAdd(N1: TNum, N2: TNum) -> TNum {
 And here's the generated Rust code:
 
 ```rust
-pub trait ComputeTAdd<N2>: TNum {
-    type Output: TNum;
+pub trait ComputeTAdd<N2> {
+    type Output;
 }
 
 pub type TAdd<N1, N2> = <N1 as ComputeTAdd<N2>>::Output;
 
-impl<N2> ComputeTAdd<N2> for Z
-where N2: TNum
-{
+impl<N2> ComputeTAdd<N2> for Z {
     type Output = N2;
 }
 
 impl<N3, N2> ComputeTAdd<N2> for S<N3>
 where
-    N2: TNum,
-    N3: TNum + ComputeTAdd<S<N2>>
+    N3: ComputeTAdd<S<N2>>
 {
     type Output = TAdd<N3, S<N2>>;
 }
