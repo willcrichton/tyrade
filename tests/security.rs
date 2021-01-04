@@ -1,3 +1,6 @@
+#![feature(generic_associated_types, specialization)]
+#![allow(incomplete_features)]
+
 use tyrade::*;
 
 tyrade! {
@@ -6,7 +9,7 @@ tyrade! {
     High
   }
 
-  fn MaxSec(S1: Security, S2: Security) -> Security {
+  fn MaxSec<S1, S2>() {
     match S1 {
       Low => match S2 {
         Low => Low,

@@ -1,15 +1,20 @@
 use tyrade_macro::tyrade;
-use crate::tyrade_types::*;
-
+use crate::tcore::*;
+  
 tyrade! {
-  fn TIf<K>(Cond: TBool, Then: K, Else: K) -> K {
+  enum TBool {
+    TTrue,
+    TFalse
+  }
+
+  fn TIf<Cond, Then, Else>() {
     match Cond {
       TTrue => Then,
       TFalse => Else
     }
   }
 
-  fn TAnd(Left: TBool, Right: TBool) -> TBool {
+  fn TAnd<Left, Right>() {
     match Left {
       TTrue => match Right {
         TTrue => TTrue,
@@ -28,3 +33,5 @@ fn bool_tests() {
   assert_type_eq::<TFalse, TAnd<TFalse, TTrue>>();
   assert_type_eq::<TFalse, TAnd<TFalse, TFalse>>();
 }
+
+

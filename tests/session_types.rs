@@ -1,3 +1,6 @@
+#![feature(generic_associated_types, specialization)]
+#![allow(incomplete_features)]
+
 use tyrade::*;
 use std::marker::PhantomData;
 
@@ -12,15 +15,15 @@ tyrade! {
     Goto(TNum)
   }
 
-  fn Dual(S: SessionType) -> SessionType {
+  fn Dual<S>() {
     match S {
       Close => S,
-      Recv(T @ Type, S2 @ SessionType) => Send(T, Dual(S2)),
-      Send(T @ Type, S2 @ SessionType) => Recv(T, Dual(S2)),
-      Choose(S2 @ SessionType, S3 @ SessionType) => Offer(Dual(S2), Dual(S3)),
-      Offer(S2 @ SessionType, S3 @ SessionType) => Choose(Dual(S2), Dual(S3)),
-      Label(S2 @ SessionType) => Label(Dual(S2)),
-      Goto(N @ TNum) => S
+      Recv(T, S2) => Send(T, Dual(S2)),
+      Send(T, S2) => Recv(T, Dual(S2)),
+      Choose(S2, S3) => Offer(Dual(S2), Dual(S3)),
+      Offer(S2, S3) => Choose(Dual(S2), Dual(S3)),
+      Label(S2) => Label(Dual(S2)),
+      Goto(N) => S
     }
   }
 }
