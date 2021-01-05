@@ -459,7 +459,7 @@ fn translate_expr(env: &FnTransEnv, expr: &Expr) -> Vec<FnTransOutput> {
 fn gen_impls(fn_: ItemFn) -> TokenStream {
   let fn_name = &fn_.sig.ident;
   let compute_name = str_to_ident(format!("Compute{}", fn_.sig.ident));
-  let compute_family_name = str_to_ident(format!("Compute{}Family", fn_.sig.ident));
+  let compute_family_name = str_to_ident(format!("{}Family", fn_.sig.ident));
 
   let args: Vec<_> = fn_
     .sig

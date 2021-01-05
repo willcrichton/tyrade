@@ -89,6 +89,15 @@ tyrade!{
       High => High
     }
   }
+
+  // In the high-level language, we can more easily see a chance for simplification.
+  fn MaxLevel2<S1, S2>() {
+    match S1 {
+      Low => S2,
+      High => High
+    }
+  }
+
 }
 ```
 
