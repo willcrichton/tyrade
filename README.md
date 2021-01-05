@@ -82,7 +82,7 @@ tyrade!{
 
   fn MaxLevel<S1, S2>() {
     match S1 {
-      Low => S2,
+      Low => match S2 {
         Low => Low,
         High => High
       }
