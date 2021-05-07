@@ -186,7 +186,7 @@ Consider the translation of `TAdd`. Here's the Tyrade definition:
 fn TAdd<N1, N2>() {
   match N1 {
     Z => N2,
-    S(N3 @ TNum) => TAdd(N3, S(N2))
+    S(N3) => TAdd(N3, S(N2))
   }
 }
 ```
