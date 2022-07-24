@@ -7,15 +7,17 @@
 * [How does Tyrade work?](#how-does-tyrade-work)
 * [Next steps](#next-steps)
 
-Tyrade is a proof-of-concept language showing how Rust traits enable a general purpose type-level programming model. Its goal is to show that type-level programming is possible for useful tasks (not writing Turing machines), and programs can be written in a reasonable way. Here's what the language looks like:
+Tyrade is a proof-of-concept language showing how Rust traits enable a general-purpose type-level programming model. Its goal is to show that type-level programming is possible for useful tasks (not just writing Turing machines), and that programs can be written in a reasonable way. Here's what the language looks like:
 
 ```rust
 tyrade! {
+  // A type-level enum for Peano numerals, with "Z" (zero) and "S(n)" (successor).
   enum TNum {
     Z,
     S(TNum)
   }
 
+  // A function that adds two Peano numerals together.
   fn TAdd<N1, N2>() {
     match N1 {
       Z => N2,
@@ -30,17 +32,17 @@ fn num_tests() {
 }
 ```
 
-At its core, Tyrade supports recursive enum types (kinds, technically) and pure recursive functions. For the main ideas behind Tyrade, continue below or consider reading my [blog post on type-level programming](http://willcrichton.net/notes/type-level-programming/).
+At its core, Tyrade supports recursive enums and pure recursive functions. For the main ideas behind Tyrade, continue below or consider reading my blog post on type-level programming: <https://willcrichton.net/notes/type-level-programming/>
 
 ## Motivating example: security types
 
-Others have shown that Rust traits are [Turing-complete](https://sdleffler.github.io/RustTypeSystemTuringComplete/) and can be used for e.g. [Fizz-Buzz](https://github.com/doctorn/trait-eval). However, the direct expression of type-level programming in traits is quite obtuse, i.e. the relationship between the conceptual program and the actual traits are obscured.
+Others have shown that Rust traits are [Turing-complete](https://sdleffler.github.io/RustTypeSystemTuringComplete/) and can be used for e.g. [Fizz-Buzz](https://github.com/doctorn/trait-eval). However, the direct expression of type-level programs in traits is quite obtuse, i.e. the relationship between the conceptual program and the actual traits is hard to see.
 
 As a simple example, consider two types `HighSec` and `LowSec` representing the security of an item:
 
 ```rust
-struct HighSec;
-struct LowSec;
+struct High;
+struct Low;
 
 struct Item<T, Sec> {
   t: T,
@@ -48,7 +50,7 @@ struct Item<T, Sec> {
 }
 ```
 
-A simple type-level program is to compute the maximum of two security levels. That is, if `S1 = S2 = Low`, then return `Low`, else return `High`. To encode this program in Rust traits, we turn the `MaxLevel` function into a trait, with an `impl` for each condition.
+A simple type-level program is to compute the maximum of two security levels `S1` and `S2`. That is, if `S1 = S2 = Low`, then return `Low`, else return `High`. To encode this program in Rust traits, we turn the `MaxLevel` function into a trait, with an `impl` for each condition.
 
 ```rust
 trait ComputeMaxLevel<Other> {
@@ -56,17 +58,17 @@ trait ComputeMaxLevel<Other> {
 }
 
 // These impls define the core computation
-impl ComputeMaxLevel<LowSec>  for LowSec  { type Output = LowSec;  }
-impl ComputeMaxLevel<HighSec> for LowSec  { type Output = HighSec; }
-impl ComputeMaxLevel<LowSec>  for HighSec { type Output = HighSec; }
-impl ComputeMaxLevel<HighSec> for HighSec { type Output = HighSec; }
+impl ComputeMaxLevel<Low>  for Low  { type Output = Low;  }
+impl ComputeMaxLevel<High> for Low  { type Output = High; }
+impl ComputeMaxLevel<Low>  for High { type Output = High; }
+impl ComputeMaxLevel<High> for High { type Output = High; }
 
 // The type alias gives us a more convenient way to "call" the type operator
 type MaxLevel<L, R> = <L as ComputeMaxLevel<R>>::Output;
 
 fn sec_tests() {
   // example unit tests
-  assert_type_eq::<Low, MaxLevel<Low, Low>>();
+  assert_type_eq::<Low,  MaxLevel<Low, Low>>();
   assert_type_eq::<High, MaxLevel<Low, High>>();
 }
 ```
@@ -97,11 +99,10 @@ tyrade!{
       High => High
     }
   }
-
 }
 ```
 
-This way, both the data-type definition and the type-level program are expressed using familiar constructs like `enum` and `match`.
+This way, both the type definition and the type-level program are expressed using familiar constructs like `fn`, `enum`, and `match`.
 
 ## More complex example: session and list types
 
@@ -133,14 +134,15 @@ tyrade! {
 }
 
 fn session_type_test() {
+  // The dual of a Send is a Recv
   assert_type_eq::<
-    Recv<i32, Close>,
-    Dual<Send<i32, Close>>
+    Dual<Send<i32, Close>>,
+    Recv<i32, Close>    
   >();
 }
 ```
 
-Tyrade provides a standard library of type-level building blocks like [booleans](https://github.com/willcrichton/tyrade/blob/master/src/tyrade_bool.rs), [numbers](https://github.com/willcrichton/tyrade/blob/master/src/tyrade_num.rs), and [lists](https://github.com/willcrichton/tyrade/blob/master/src/tyrade_list.rs). For example, we can use lists to implement the compile-time saving and indexing of jump points in session types.
+Tyrade provides a standard library of type-level building blocks like [booleans](https://github.com/willcrichton/tyrade/blob/master/src/tbool.rs), [numbers](https://github.com/willcrichton/tyrade/blob/master/src/tnum.rs), and [lists](https://github.com/willcrichton/tyrade/blob/master/src/tlist.rs). For example, we can use lists to implement the compile-time saving and indexing of jump points in session types.
 
 ```rust
 struct Chan<Env, S>(PhantomData<(Env, S)>);
