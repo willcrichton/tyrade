@@ -56,14 +56,6 @@ fn block_to_expr(block: Block) -> Expr {
   })
 }
 
-fn _kind_to_type(kind: &Ident) -> Option<Type> {
-  if &format!("{}", kind) == "Type" {
-    None
-  } else {
-    Some(ident_to_type(kind))
-  }
-}
-
 struct SubstituteVisitor {
   src: Ident,
   dst: Type,
