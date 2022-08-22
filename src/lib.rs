@@ -1,15 +1,15 @@
 #![feature(generic_associated_types, specialization)]
 #![allow(incomplete_features)]
 
-mod tcore;
 mod tbool;
-mod tnum;
-mod tlist;
+mod tcore;
 mod test_utils;
+mod tlist;
+mod tnum;
 
-pub use tyrade_macro::tyrade;
-pub use tcore::*;
 pub use tbool::*;
-pub use tnum::*;
-pub use tlist::*;
+pub use tcore::*;
 pub use test_utils::*;
+pub use tlist::*;
+pub use tnum::*;
+pub use tyrade_macro::tyrade;

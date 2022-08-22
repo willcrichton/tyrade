@@ -1,8 +1,8 @@
 #![feature(generic_associated_types, specialization)]
 #![allow(incomplete_features)]
 
-use tyrade::*;
 use std::marker::PhantomData;
+use tyrade::*;
 
 tyrade! {
   enum SessionType {
@@ -37,7 +37,8 @@ impl<Env: TList, S: SessionType> Chan<Env, Label<S>> {
 }
 
 impl<Env: TList, N: TNum> Chan<Env, Goto<N>>
-where Env: ComputeTListNth<N> + ComputeTListSkip<N>
+where
+  Env: ComputeTListNth<N> + ComputeTListSkip<N>,
 {
   fn goto(self) -> Chan<TListSkip<Env, N>, TListNth<Env, N>> {
     Chan(PhantomData)
@@ -48,11 +49,7 @@ where Env: ComputeTListNth<N> + ComputeTListSkip<N>
 fn session_type_test() {
   assert_type_eq::<Recv<i32, Close>, Dual<Send<i32, Close>>>();
 
-  let c: Chan<
-      Cons<Close, Nil>,
-      Label<Goto<S<Z>>>> = Chan(PhantomData);
-  let c: Chan<
-      Cons<Goto<S<Z>>, Cons<Close, Nil>>,
-      Goto<S<Z>>> = c.label();
+  let c: Chan<Cons<Close, Nil>, Label<Goto<S<Z>>>> = Chan(PhantomData);
+  let c: Chan<Cons<Goto<S<Z>>, Cons<Close, Nil>>, Goto<S<Z>>> = c.label();
   let _: Chan<Cons<Close, Nil>, Close> = c.goto();
 }

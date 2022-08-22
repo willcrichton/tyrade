@@ -1,6 +1,6 @@
-use tyrade_macro::tyrade;
 use crate::tbool::*;
 use crate::tcore::*;
+use tyrade_macro::tyrade;
 
 tyrade! {
   enum TNum {
@@ -42,7 +42,7 @@ tyrade! {
     }
   }
 
-  // FIXME: this function overflows stack when specialization is turned on 
+  // FIXME: this function overflows stack when specialization is turned on
   // fn TDivide<N1, N2>() {
   //   if N2 <= N1 {
   //     S(Z) + (N1 - N2) / N2

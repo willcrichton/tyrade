@@ -1,6 +1,6 @@
-use tyrade_macro::tyrade;
 use crate::tcore::*;
-  
+use tyrade_macro::tyrade;
+
 tyrade! {
   enum TBool {
     TTrue,
@@ -33,5 +33,3 @@ fn bool_tests() {
   assert_type_eq::<TFalse, TAnd<TFalse, TTrue>>();
   assert_type_eq::<TFalse, TAnd<TFalse, TFalse>>();
 }
-
-

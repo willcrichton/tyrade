@@ -1,6 +1,6 @@
-use tyrade_macro::tyrade;
-use crate::tnum::*;
 use crate::tcore::*;
+use crate::tnum::*;
+use tyrade_macro::tyrade;
 
 tyrade! {
   enum TList {
@@ -45,10 +45,11 @@ tyrade! {
 
 #[test]
 fn list_test() {
-  use crate::test_utils::assert_type_eq;
   use crate::tbool::*;
+  use crate::test_utils::assert_type_eq;
 
   assert_type_eq::<S<S<Z>>, TListLen<Cons<(), Cons<(), Nil>>>>();
   assert_type_eq::<u64, TListNth<Cons<i32, Cons<u64, Nil>>, S<Z>>>();
-  assert_type_eq::<Cons<TFalse, Cons<TTrue, Nil>>, TListMap<Cons<S<Z>, Cons<Z, Nil>>, TIsZeroFamily>>();
+  assert_type_eq::<Cons<TFalse, Cons<TTrue, Nil>>, TListMap<Cons<S<Z>, Cons<Z, Nil>>, TIsZeroFamily>>(
+  );
 }
