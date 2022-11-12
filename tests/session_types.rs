@@ -1,4 +1,4 @@
-#![feature(generic_associated_types, specialization)]
+#![feature(specialization)]
 #![allow(incomplete_features)]
 
 use std::marker::PhantomData;

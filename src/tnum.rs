@@ -59,10 +59,12 @@ fn num_tests() {
   assert_type_eq::<S<S<Z>>, TAdd<S<Z>, S<Z>>>();
 
   assert_type_eq::<TTrue, TLessThanEqual<S<Z>, S<S<Z>>>>();
-  assert_type_eq::<TFalse, TLessThanEqual<S<S<Z>>, Z>>();
+  assert_type_eq::<TFalse, TLessThanEqual<S<S<Z>>, S<Z>>>();
+  assert_type_eq::<TFalse, TLessThanEqual<S<Z>, Z>>();
 
   assert_type_eq::<S<Z>, TSub<S<S<Z>>, S<Z>>>();
 
   // TODO: this causes overflow?
-  // assert_type_eq::<S<S<Z>>, TDivide<S<S<S<S<Z>>>>, S<S<Z>>>>();
+  // assert_type_eq::<Z, TDivide<Z, S<Z>>>();
+  // assert_type_eq::<S<S<Z>>, TDivide<S<S<Z>>, S<Z>>>();
 }
